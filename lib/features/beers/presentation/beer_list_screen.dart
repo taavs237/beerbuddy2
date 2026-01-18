@@ -1,14 +1,10 @@
-import 'dart:io';
-
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io' show File;
 
 import '../../../data/beer_local_repository.dart';
 import '../../../models/beer.dart';
 import 'beer_edit_screen.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-
 
 class BeerListScreen extends StatefulWidget {
   const BeerListScreen({super.key});
@@ -18,80 +14,74 @@ class BeerListScreen extends StatefulWidget {
 }
 
 class _BeerListScreenState extends State<BeerListScreen> {
-  final repo = BeerLocalRepository();
+  final BeerLocalRepository repo = BeerLocalRepository();
+
+  List<Beer> _items = [];
+
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _load() {
+    final q = _query.trim();
+    final list = q.isEmpty ? repo.getAllNotDeleted() : repo.searchNotDeleted(q);
+
+    setState(() {
+      _items = List<Beer>.from(list);
+    });
+  }
+
+  ImageProvider? _avatarImage(Beer b) {
+    final url = (b.imageUrl ?? '').trim();
+    if (url.isNotEmpty) {
+      return NetworkImage(url);
+    }
+
+    final path = (b.imageLocalPath ?? '').trim();
+    if (path.isNotEmpty && !kIsWeb) {
+      return FileImage(File(path));
+    }
+
+    return null;
+  }
 
   Future<void> _openAdd() async {
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const BeerEditScreen()),
     );
+    _load();
   }
 
-  Future<void> _openEdit(Beer beer) async {
+  Future<void> _openEdit(String id) async {
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => BeerEditScreen(beerId: beer.id)),
+      MaterialPageRoute(builder: (_) => BeerEditScreen(beerId: id)),
     );
-  }
-
-  Future<void> _confirmDelete(Beer beer) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete beer?'),
-        content: Text('Delete "${beer.name}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (ok == true) {
-      await repo.softDelete(beer);
-    }
-  }
-
-  Widget _leading(Beer beer) {
-    final path = beer.imageLocalPath;
-    if (path == null || path.isEmpty) return const Icon(Icons.local_bar);
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: kIsWeb
-          ? Image.network(
-        path,
-        width: 48,
-        height: 48,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
-      )
-          : Image.file(
-        File(path),
-        width: 48,
-        height: 48,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
-      ),
-    );
+    _load();
   }
 
   @override
   Widget build(BuildContext context) {
-    final box = repo.listenableBox(); // Box<Beer>
+    final t = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('BeerBuddy'),
+        title: const Text('Beers'),
         actions: [
           IconButton(
-            onPressed: () => FirebaseAuth.instance.signOut(),
-            icon: const Icon(Icons.logout),
-            tooltip: 'Log out',
+            tooltip: 'Refresh',
+            icon: const Icon(Icons.refresh),
+            onPressed: _load,
           ),
         ],
       ),
@@ -99,47 +89,92 @@ class _BeerListScreenState extends State<BeerListScreen> {
         onPressed: _openAdd,
         child: const Icon(Icons.add),
       ),
-      body: ValueListenableBuilder<Box<Beer>>(
-        valueListenable: box.listenable(),
-        builder: (context, b, _) {
-          final items = repo.getAllNotDeleted();
-
-          if (items.isEmpty) {
-            return const Center(
-              child: Text('Pole veel ühtegi õlut. Vajuta +'),
-            );
-          }
-
-          return ListView.separated(
-            itemCount: items.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (context, index) {
-              final beer = items[index];
-
-              return ListTile(
-                leading: _leading(beer),
-                title: Text(beer.name),
-                subtitle: Text('${beer.rating}/5 • ${beer.comment}'),
-                onTap: () => _openEdit(beer),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.delete),
-                      tooltip: 'Delete',
-                      onPressed: () => _confirmDelete(beer),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.edit),
-                      tooltip: 'Edit',
-                      onPressed: () => _openEdit(beer),
-                    ),
-                  ],
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+            child: TextField(
+              controller: _searchCtrl,
+              decoration: InputDecoration(
+                hintText: 'Search beers...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _query.isEmpty
+                    ? null
+                    : IconButton(
+                  tooltip: 'Clear',
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    _searchCtrl.clear();
+                    setState(() => _query = '');
+                    _load();
+                  },
                 ),
-              );
-            },
-          );
-        },
+                border: const OutlineInputBorder(),
+              ),
+              onChanged: (v) {
+                setState(() => _query = v);
+                _load();
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: _items.isEmpty
+                ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  _query.isEmpty
+                      ? 'No beers yet.\nTap + to add one.'
+                      : 'No results for "$_query".',
+                  style: t.textTheme.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            )
+                : ListView.separated(
+              padding: const EdgeInsets.all(12),
+              itemCount: _items.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (context, i) {
+                final b = _items[i];
+                final img = _avatarImage(b);
+
+                return Card(
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      radius: 24,
+                      backgroundImage: img,
+                      child: img == null
+                          ? Text(
+                        b.name.isNotEmpty
+                            ? b.name[0].toUpperCase()
+                            : '?',
+                      )
+                          : null,
+                    ),
+                    title: Text(
+                      b.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      'Rating: ${b.rating}/5',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: IconButton(
+                      tooltip: 'Edit',
+                      icon: const Icon(Icons.edit),
+                      onPressed: () => _openEdit(b.id),
+                    ),
+                    onTap: () => _openEdit(b.id),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

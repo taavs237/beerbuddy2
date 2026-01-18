@@ -14,18 +14,19 @@ dependencies:
   cupertino_icons: ^1.0.8
   image_picker: ^1.1.2
 
-  # Firebase
   firebase_core: ^3.4.0
   firebase_auth: ^5.2.0
   cloud_firestore: ^5.4.0
   firebase_storage: ^12.2.0
+  connectivity_plus: ^6.0.5
+
 
   # Offline-first local DB + helpers
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   path_provider: ^2.1.4
   uuid: ^4.5.1
-  connectivity_plus: ^6.0.5
+
 
 dev_dependencies:
   flutter_test:

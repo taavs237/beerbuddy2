@@ -8,17 +8,36 @@ class BeerLocalRepository {
 
   Box<Beer> get _box => Hive.box<Beer>(_boxName);
 
-  Box<Beer> listenableBox() => Hive.box<Beer>('beers');
+  /// Kasutatakse UI-s ValueListenableBuilder jaoks
+  Box<Beer> listenableBox() => Hive.box<Beer>(_boxName);
 
-
+  /// Kõik mitte-kustutatud õlled (sorteeritud viimase muudatuse järgi)
   List<Beer> getAllNotDeleted() {
     final items = _box.values.where((b) => !b.isDeleted).toList();
     items.sort((a, b) => b.lastModified.compareTo(a.lastModified));
     return items;
   }
 
+  /// Otsing nime või kommentaari järgi (offline, Hive pealt)
+  List<Beer> searchNotDeleted(String query) {
+    final q = query.trim().toLowerCase();
+
+    final items = _box.values.where((b) {
+      if (b.isDeleted) return false;
+      if (q.isEmpty) return true;
+
+      final name = b.name.toLowerCase();
+      final comment = b.comment.toLowerCase();
+      return name.contains(q) || comment.contains(q);
+    }).toList();
+
+    items.sort((a, b) => b.lastModified.compareTo(a.lastModified));
+    return items;
+  }
+
   Beer? getById(String id) => _box.get(id);
 
+  /// Lisa uus õlu (offline-first)
   Future<Beer> add({
     required String name,
     required int rating,
@@ -26,6 +45,7 @@ class BeerLocalRepository {
     String? imageLocalPath,
   }) async {
     final now = DateTime.now().millisecondsSinceEpoch;
+
     final beer = Beer(
       id: _uuid.v4(),
       name: name.trim(),
@@ -42,6 +62,7 @@ class BeerLocalRepository {
     return beer;
   }
 
+  /// Uuenda olemasolevat õlut
   Future<void> update(
       Beer beer, {
         required String name,
@@ -62,6 +83,7 @@ class BeerLocalRepository {
     await beer.save();
   }
 
+  /// Soft delete (vajalik sync + offline jaoks)
   Future<void> softDelete(Beer beer) async {
     final now = DateTime.now().millisecondsSinceEpoch;
 

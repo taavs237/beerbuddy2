@@ -31,6 +31,31 @@ class Beer extends HiveObject {
   @HiveField(8)
   bool pendingSync;
 
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'name': name,
+    'rating': rating,
+    'comment': comment,
+    'imageUrl': imageUrl,
+    'lastModified': lastModified,
+    'isDeleted': isDeleted,
+  };
+
+  static Beer fromMap(Map<String, dynamic> data) {
+    return Beer(
+      id: (data['id'] ?? '') as String,
+      name: (data['name'] ?? '') as String,
+      rating: (data['rating'] ?? 3) as int,
+      comment: (data['comment'] ?? '-') as String,
+      imageLocalPath: null,
+      imageUrl: data['imageUrl'] as String?,
+      lastModified: (data['lastModified'] ?? 0) as int,
+      isDeleted: (data['isDeleted'] ?? false) as bool,
+      pendingSync: false,
+    );
+  }
+
+
   Beer({
     required this.id,
     required this.name,
