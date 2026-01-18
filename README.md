@@ -48,6 +48,7 @@ Images are stored in private Firebase Storage paths
 Security rules are included in the repository.
 
 Project Structure (simplified)
+
 lib/ ├── data/ │ ├── beer_local_repository.dart │ ├── beer_sync_service.dart │ └── beer_image_storage_service.dart ├── models/ │ └── beer.dart ├── ui/ │ └── screens/ │ ├── beer_list_screen.dart │ └── beer_edit_screen.dart docs/ ├── data_model.md ├── challenge.md └── architecture.md firebase/ ├── firestore.rules └── storage.rules
 
 Getting Started
